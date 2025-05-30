@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from openai import AzureOpenAI
+from typing import List
 import os
 import json
 
