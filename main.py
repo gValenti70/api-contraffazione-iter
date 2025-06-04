@@ -126,7 +126,13 @@ async def analizza_oggetto(input: OggettoInput):
             if campo not in json_output:
                 raise HTTPException(status_code=500, detail=f"Campo mancante: {campo}")
 
+        # Se siamo alla terza immagine, forziamo il comportamento finale
+        if num_foto >= 3:
+            json_output["richiedi_altra_foto"] = False
+            json_output["dettaglio_richiesto"] = ""
+        
         return json_output
+
 
     except Exception as e:
         logging.error(f"Errore backend: {e}")
