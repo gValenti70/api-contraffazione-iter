@@ -19,7 +19,6 @@ class OggettoInput(BaseModel):
     marca: str
     immagini: List[str]
 
-
 @app.post("/analizza-oggetto")
 async def analizza_oggetto(input: OggettoInput):
     num_foto = len(input.immagini)
@@ -27,15 +26,18 @@ async def analizza_oggetto(input: OggettoInput):
     if num_foto == 0:
         raise HTTPException(status_code=400, detail="Nessuna immagine inviata.")
 
-    # Prompt dinamico
     if num_foto == 1:
         prompt = (
             f"Stai analizzando un oggetto di tipo '{input.tipologia}' della marca '{input.marca}'. "
-            f"Ti è stata fornita solo una fotografia. In base a questa immagine, indica quale dettaglio chiave dovrebbe essere fotografato in modo ravvicinato "
-            f"per aiutarti a determinare l'autenticità dell'oggetto.\n"
-            f"Rispondi in formato JSON:\n"
+            f"Ti è stata fornita solo una fotografia.\n\n"
+            f"Prima verifica se l'immagine è rilevante: se non mostra chiaramente l'oggetto richiesto, restituisci:\n"
+            f"- \"percentuale\": -1\n"
+            f"- \"motivazione\": spiega che la foto è fuori contesto.\n\n"
+            f"Se è rilevante, spiega cosa manca per determinare l'autenticità e indica un dettaglio da fotografare meglio.\n"
+            f"La percentuale deve essere coerente: bassa se rassicurante, alta se sospetta.\n\n"
+            f"Rispondi in JSON:\n"
             "{\n"
-            "  \"percentuale\": numero intero,\n"
+            "  \"percentuale\": numero intero (0–100 oppure -1),\n"
             "  \"motivazione\": \"stringa\",\n"
             "  \"richiedi_altra_foto\": true,\n"
             "  \"dettaglio_richiesto\": \"stringa\"\n"
@@ -44,31 +46,33 @@ async def analizza_oggetto(input: OggettoInput):
     elif num_foto == 2:
         prompt = (
             f"Stai analizzando un oggetto di tipo '{input.tipologia}' della marca '{input.marca}'. "
-            f"Hai ricevuto due fotografie. In base a queste immagini, puoi stimare la probabilità che l'oggetto sia contraffatto. "
-            f"Se hai ancora dubbi, suggerisci un dettaglio chiave da fotografare meglio per aiutarti. "
-            f"Rispondi in JSON come segue:\n"
+            f"Hai ricevuto due fotografie.\n\n"
+            f"Se le immagini non sono pertinenti all'oggetto, restituisci -1 come percentuale con una motivazione.\n"
+            f"Altrimenti, analizza i dettagli e indica la probabilità di contraffazione in modo coerente con la tua analisi: "
+            f"bassa se l'oggetto sembra autentico, alta se sospetto. Se hai bisogno di un'altra immagine, specifica quale.\n\n"
+            f"Rispondi in JSON:\n"
             "{\n"
-            "  \"percentuale\": numero intero,\n"
+            "  \"percentuale\": numero intero (0–100 oppure -1),\n"
             "  \"motivazione\": \"stringa\",\n"
-            "  \"richiedi_altra_foto\": true/false,\n"
-            "  \"dettaglio_richiesto\": \"stringa (vuota se non necessaria)\"\n"
+            "  \"richiedi_altra_foto\": true o false,\n"
+            "  \"dettaglio_richiesto\": \"stringa oppure vuota\"\n"
             "}"
         )
     else:
         prompt = (
-            f"Hai ricevuto 3 fotografie di un oggetto di tipo '{input.tipologia}' della marca '{input.marca}'. "
-            f"Analizzale e valuta se si tratta di un oggetto autentico o contraffatto. "
-            f"Fornisci una percentuale di contraffazione stimata e le motivazioni.\n"
+            f"Hai ricevuto 3 fotografie di un oggetto di tipo '{input.tipologia}' della marca '{input.marca}'.\n\n"
+            f"Se le immagini non mostrano l'oggetto corretto, restituisci -1 come percentuale e spiega.\n"
+            f"Se sono pertinenti, analizza attentamente e fornisci una stima della probabilità di contraffazione "
+            f"coerente con la tua motivazione: bassa se rassicurante, alta se sospetta.\n\n"
             f"Rispondi solo in formato JSON:\n"
             "{\n"
-            "  \"percentuale\": numero intero,\n"
+            "  \"percentuale\": numero intero (0–100 oppure -1),\n"
             "  \"motivazione\": \"stringa\",\n"
             "  \"richiedi_altra_foto\": false,\n"
             "  \"dettaglio_richiesto\": \"\"\n"
             "}"
         )
 
-    # Messaggi
     messaggi = [
         {
             "role": "user",
@@ -89,20 +93,20 @@ async def analizza_oggetto(input: OggettoInput):
         )
         contenuto = response.choices[0].message.content.strip()
 
-        # Sanifica contenuto da blocchi Markdown
         if contenuto.startswith("```"):
             contenuto = contenuto.split("```")[1].strip()
             if contenuto.startswith("json"):
                 contenuto = contenuto[4:].strip()
 
-        try:
-            json_output = json.loads(contenuto)
-        except json.JSONDecodeError as e:
-            logging.error(f"Errore JSON: {e}\nRisposta:\n{contenuto}")
-            raise HTTPException(status_code=500, detail="⚠️ Errore nel parsing della risposta JSON")
+        json_output = json.loads(contenuto)
+
+        campi = ["percentuale", "motivazione", "richiedi_altra_foto", "dettaglio_richiesto"]
+        for campo in campi:
+            if campo not in json_output:
+                raise HTTPException(status_code=500, detail=f"⚠️ Campo mancante: {campo}")
 
         return json_output
 
     except Exception as e:
-        logging.error(f"Errore generale: {e}")
+        logging.error(f"Errore back-end: {e}")
         raise HTTPException(status_code=500, detail="Errore durante l'elaborazione della richiesta.")
