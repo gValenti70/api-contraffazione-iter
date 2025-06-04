@@ -13,16 +13,18 @@ client = AzureOpenAI(
 )
 
 app = FastAPI()
+
 deployment = "gpt-4o"
 
+# Modello dati in input
 class OggettoInput(BaseModel):
     tipologia: Optional[str] = "borsa"
     immagini: List[str]
 
 @app.post("/analizza-oggetto")
 async def analizza_oggetto(input: OggettoInput):
-    num_foto = len(input.immagini)
     tipologia = input.tipologia or "borsa"
+    num_foto = len(input.immagini)
 
     if num_foto == 0:
         raise HTTPException(status_code=400, detail="Nessuna immagine inviata.")
@@ -32,7 +34,7 @@ async def analizza_oggetto(input: OggettoInput):
             f"Stai analizzando un oggetto che sembra essere una '{tipologia}'. "
             f"Ti è stata fornita una sola immagine.\n\n"
             f"Analizza i dettagli visivi per determinare se sembra un oggetto autentico o contraffatto. "
-            f"Riconosci anche la **marca** visibile o probabile dell'oggetto, se presente, e usala nel tuo ragionamento.\n\n"
+            f"Riconosci anche la marca visibile o probabile dell'oggetto, se presente, e usala nel tuo ragionamento.\n\n"
             f"Se la foto non mostra l'oggetto chiaramente, restituisci:\n"
             f"- \"percentuale\": -1\n"
             f"- \"motivazione\": spiega perché non è valutabile\n\n"
@@ -42,7 +44,7 @@ async def analizza_oggetto(input: OggettoInput):
             f"- Dettagli plausibili ma serve conferma -> 20-40\n"
             f"- Elementi sospetti -> 40-70\n"
             f"- Forti segnali di falsificazione -> 70-100\n\n"
-            f"La percentuale deve essere coerente con la motivazione.\n\n"
+            f"La percentuale deve essere coerente con la tua motivazione.\n\n"
             f"Rispondi solo in JSON:\n"
             "{\n"
             "  \"percentuale\": numero intero (0–100 oppure -1),\n"
@@ -79,8 +81,8 @@ async def analizza_oggetto(input: OggettoInput):
             f"Stai analizzando un oggetto che sembra essere una '{tipologia}', usando tre fotografie.\n\n"
             f"Analizza i dettagli per determinare l'autenticità dell'oggetto. "
             f"Riconosci autonomamente la marca dall'aspetto e dai segni distintivi.\n\n"
-            f"Se nessuna immagine è pertinente, restituisci -1.\n"
-            f> Altrimenti, usa questi criteri:\n"
+            f"Se nessuna immagine è pertinente, restituisci -1.\n\n"
+            f"Altrimenti, usa questi criteri:\n"
             f"- Oggetto autentico in ogni dettaglio -> 0-20\n"
             f"- Coerente ma serve conferma -> 20-40\n"
             f"- Dettagli sospetti o incoerenti -> 40-70\n"
@@ -122,8 +124,8 @@ async def analizza_oggetto(input: OggettoInput):
 
         json_output = json.loads(contenuto)
 
-        campi = ["percentuale", "motivazione", "richiedi_altra_foto", "dettaglio_richiesto"]
-        for campo in campi:
+        campi_attesi = ["percentuale", "motivazione", "richiedi_altra_foto", "dettaglio_richiesto"]
+        for campo in campi_attesi:
             if campo not in json_output:
                 raise HTTPException(status_code=500, detail=f"Campo mancante: {campo}")
 
@@ -132,3 +134,4 @@ async def analizza_oggetto(input: OggettoInput):
     except Exception as e:
         logging.error(f"Errore backend: {e}")
         raise HTTPException(status_code=500, detail="Errore durante l'elaborazione della richiesta.")
+
