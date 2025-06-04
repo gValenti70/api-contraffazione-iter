@@ -1,9 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from openai import AzureOpenAI
 from typing import List
+from openai import AzureOpenAI
 import os
 import json
+import logging
 
 client = AzureOpenAI(
     api_key=os.getenv("OPENAI_APIKEY"),
