@@ -31,27 +31,40 @@ async def analizza_oggetto(input: OggettoInput):
         prompt = (
             f"Stai analizzando un oggetto di tipo '{input.tipologia}' della marca '{input.marca}'. "
             f"Ti è stata fornita solo una fotografia.\n\n"
-            f"Prima verifica se l'immagine è rilevante: se non mostra chiaramente l'oggetto richiesto, restituisci:\n"
+            f"Se l'immagine non mostra un oggetto coerente con la tipologia richiesta, restituisci:\n"
             f"- \"percentuale\": -1\n"
-            f"- \"motivazione\": spiega che la foto è fuori contesto.\n\n"
-            f"Se è rilevante, spiega cosa manca per determinare l'autenticità e indica un dettaglio da fotografare meglio.\n"
-            f"La percentuale deve essere coerente: molto bassa se rassicurante, alta se sospetta.\n\n"
-            f"Rispondi in JSON:\n"
+            f"- \"motivazione\": spiega che la foto non è rilevante\n\n"
+            f"> Altrimenti, indica quale parte dell'oggetto andrebbe fotografata meglio per valutarne l'autenticità. "
+            f"Fornisci anche una stima della probabilità di contraffazione, secondo queste regole:\n"
+            f"- Oggetto apparentemente autentico -> percentuale tra 0 e 20\n"
+            f"- Dettagli plausibili ma serve conferma -> 20-40\n"
+            f"- Elementi sospetti -> 40-70\n"
+            f"- Segnali forti di contraffazione -> 70-100\n\n"
+            f"La percentuale deve essere coerente con la tua motivazione.\n\n"
+            f"Rispondi solo in JSON:\n"
             "{\n"
             "  \"percentuale\": numero intero (0–100 oppure -1),\n"
             "  \"motivazione\": \"stringa\",\n"
             "  \"richiedi_altra_foto\": true,\n"
-            "  \"dettaglio_richiesto\": \"stringa\"\n"
+            "  \"dettaglio_richiesto\": \"stringa descrittiva\"\n"
             "}"
         )
+    
     elif num_foto == 2:
         prompt = (
             f"Stai analizzando un oggetto di tipo '{input.tipologia}' della marca '{input.marca}'. "
             f"Hai ricevuto due fotografie.\n\n"
-            f"Se le immagini non sono pertinenti all'oggetto, restituisci -1 come percentuale con una motivazione.\n"
-            f"Altrimenti, analizza i dettagli e indica la probabilità di contraffazione in modo coerente con la tua analisi: "
-            f"bassissima se l'oggetto sembra autentico, alta se sospetto. Se hai bisogno di un'altra immagine, specifica quale.\n\n"
-            f"Rispondi in JSON:\n"
+            f"Se nessuna delle due immagini mostra un oggetto coerente, restituisci:\n"
+            f"- \"percentuale\": -1\n"
+            f"- \"motivazione\": spiega che non è possibile valutare\n\n"
+            f"> Altrimenti, valuta la probabilità di contraffazione secondo i seguenti criteri:\n"
+            f"- Dettagli autentici -> 0-20\n"
+            f"- Qualità buona ma non del tutto confermata -> 20-40\n"
+            f"- Alcuni dettagli anomali -> 40-70\n"
+            f"- Forti dubbi -> 70-100\n\n"
+            f"La motivazione deve essere coerente con la percentuale.\n"
+            f"Se serve un'altra immagine, suggerisci il dettaglio da fotografare.\n\n"
+            f"Rispondi solo in JSON:\n"
             "{\n"
             "  \"percentuale\": numero intero (0–100 oppure -1),\n"
             "  \"motivazione\": \"stringa\",\n"
@@ -59,12 +72,19 @@ async def analizza_oggetto(input: OggettoInput):
             "  \"dettaglio_richiesto\": \"stringa oppure vuota\"\n"
             "}"
         )
+    
     else:
         prompt = (
             f"Hai ricevuto 3 fotografie di un oggetto di tipo '{input.tipologia}' della marca '{input.marca}'.\n\n"
-            f"Se le immagini non mostrano l'oggetto corretto, restituisci -1 come percentuale e spiega.\n"
-            f"Se sono pertinenti, analizza attentamente e fornisci una stima della probabilità di contraffazione "
-            f"coerente con la tua motivazione: bassa se rassicurante, alta se sospetta e molto bassa se sembra davvero autentico.\n\n"
+            f"Se nessuna immagine mostra l'oggetto richiesto, restituisci:\n"
+            f"- \"percentuale\": -1\n"
+            f"- \"motivazione\": spiega che l'oggetto non è riconoscibile o fuori contesto\n\n"
+            f"> Altrimenti, valuta il rischio di contraffazione secondo queste linee guida:\n"
+            f"- Oggetto conforme in ogni dettaglio -> 0-20\n"
+            f"- Oggetto plausibile ma serve conferma -> 20-40\n"
+            f"- Dettagli sospetti o incoerenti -> 40-70\n"
+            f"- Evidenti segni di falsificazione -> 70-100\n\n"
+            f"La percentuale deve essere coerente con la motivazione, che spiega chiaramente il motivo della valutazione.\n\n"
             f"Rispondi solo in formato JSON:\n"
             "{\n"
             "  \"percentuale\": numero intero (0–100 oppure -1),\n"
@@ -73,6 +93,7 @@ async def analizza_oggetto(input: OggettoInput):
             "  \"dettaglio_richiesto\": \"\"\n"
             "}"
         )
+
 
     messaggi = [
         {
