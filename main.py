@@ -13,10 +13,8 @@ client = AzureOpenAI(
 )
 
 app = FastAPI()
-
 deployment = "gpt-4o"
 
-# Modello dati in input
 class OggettoInput(BaseModel):
     tipologia: Optional[str] = "borsa"
     immagini: List[str]
@@ -29,26 +27,28 @@ async def analizza_oggetto(input: OggettoInput):
     if num_foto == 0:
         raise HTTPException(status_code=400, detail="Nessuna immagine inviata.")
 
+    # Costruzione del prompt in base al numero di immagini
     if num_foto == 1:
         prompt = (
             f"Stai analizzando un oggetto che sembra essere una '{tipologia}'. "
             f"Ti è stata fornita una sola immagine.\n\n"
             f"Analizza i dettagli visivi per determinare se sembra un oggetto autentico o contraffatto. "
-            f"Riconosci anche la marca visibile o probabile dell'oggetto, se presente, e usala nel tuo ragionamento.\n\n"
+            f"Riconosci anche la marca visibile o probabile dell'oggetto e indicala nel campo 'marca_stimata'.\n\n"
             f"Se la foto non mostra l'oggetto chiaramente, restituisci:\n"
             f"- \"percentuale\": -1\n"
-            f"- \"motivazione\": spiega perché non è valutabile\n\n"
-            f"> Altrimenti, indica quale zona andrebbe fotografata meglio per una valutazione più affidabile. "
-            f"Stima la probabilità di contraffazione seguendo queste linee guida:\n"
-            f"- Oggetto apparentemente autentico -> 0-20\n"
-            f"- Dettagli plausibili ma serve conferma -> 20-40\n"
-            f"- Elementi sospetti -> 40-70\n"
-            f"- Forti segnali di falsificazione -> 70-100\n\n"
-            f"La percentuale deve essere coerente con la tua motivazione.\n\n"
+            f"- \"motivazione\": spiegazione\n"
+            f"- \"marca_stimata\": \"\"\n\n"
+            f"Altrimenti, fornisci:\n"
+            f"- percentuale stimata tra:\n"
+            f"  - 0–20 -> oggetto apparentemente autentico\n"
+            f"  - 20–40 -> serve conferma\n"
+            f"  - 40–70 -> elementi sospetti\n"
+            f"  - 70–100 -> probabile contraffazione\n\n"
             f"Rispondi solo in JSON:\n"
             "{\n"
             "  \"percentuale\": numero intero (0–100 oppure -1),\n"
             "  \"motivazione\": \"stringa\",\n"
+            "  \"marca_stimata\": \"stringa (vuota se non determinabile)\",\n"
             "  \"richiedi_altra_foto\": true,\n"
             "  \"dettaglio_richiesto\": \"stringa\"\n"
             "}"
@@ -57,20 +57,18 @@ async def analizza_oggetto(input: OggettoInput):
     elif num_foto == 2:
         prompt = (
             f"Stai analizzando un oggetto che sembra essere una '{tipologia}', basandoti su due immagini.\n\n"
-            f"Analizza i dettagli visivi per determinare se sembra autentico o contraffatto. "
-            f"Riconosci autonomamente la marca, se possibile.\n\n"
-            f"Se le immagini non sono pertinenti, restituisci -1 con spiegazione.\n\n"
-            f"Stima la probabilità secondo questi intervalli:\n"
-            f"- Dettagli autentici -> 0-20\n"
-            f"- Dettagli plausibili ma non confermati -> 20-40\n"
-            f"- Alcuni segnali anomali -> 40-70\n"
-            f"- Forti sospetti -> 70-100\n\n"
-            f"La motivazione deve spiegare la percentuale.\n"
-            f"Se servono altri dettagli, indicane uno da fotografare.\n\n"
+            f"Analizza i dettagli visivi per stimare l'autenticità e indica la marca riconoscibile nel campo 'marca_stimata'.\n\n"
+            f"Se non riconoscibile, lascia marca_stimata vuota. Se le immagini non sono pertinenti, restituisci -1.\n\n"
+            f"Classifica la probabilità così:\n"
+            f"- 0–20 -> autentico\n"
+            f"- 20–40 -> buono ma non sicuro\n"
+            f"- 40–70 -> sospetto\n"
+            f"- 70–100 -> fortemente falso\n\n"
             f"Rispondi solo in JSON:\n"
             "{\n"
             "  \"percentuale\": numero intero (0–100 oppure -1),\n"
             "  \"motivazione\": \"stringa\",\n"
+            "  \"marca_stimata\": \"stringa (vuota se non nota)\",\n"
             "  \"richiedi_altra_foto\": true o false,\n"
             "  \"dettaglio_richiesto\": \"stringa\"\n"
             "}"
@@ -78,20 +76,19 @@ async def analizza_oggetto(input: OggettoInput):
 
     else:
         prompt = (
-            f"Stai analizzando un oggetto che sembra essere una '{tipologia}', usando tre fotografie.\n\n"
-            f"Analizza i dettagli per determinare l'autenticità dell'oggetto. "
-            f"Riconosci autonomamente la marca dall'aspetto e dai segni distintivi.\n\n"
-            f"Se nessuna immagine è pertinente, restituisci -1.\n\n"
-            f"Altrimenti, usa questi criteri:\n"
-            f"- Oggetto autentico in ogni dettaglio -> 0-20\n"
-            f"- Coerente ma serve conferma -> 20-40\n"
-            f"- Dettagli sospetti o incoerenti -> 40-70\n"
-            f"- Chiari segni di falsificazione -> 70-100\n\n"
-            f"La percentuale deve essere coerente con la motivazione.\n\n"
+            f"Hai ricevuto 3 immagini di un oggetto che sembra essere una '{tipologia}'. "
+            f"Analizza i dettagli e indica se sembra autentico o contraffatto. Riconosci la marca visivamente, e riportala in 'marca_stimata'.\n\n"
+            f"Se le immagini non sono pertinenti, restituisci -1.\n\n"
+            f"Classifica:\n"
+            f"- 0–20 -> autentico\n"
+            f"- 20–40 -> coerente ma incerto\n"
+            f"- 40–70 -> sospetto\n"
+            f"- 70–100 -> molto probabilmente falso\n\n"
             f"Rispondi solo in JSON:\n"
             "{\n"
             "  \"percentuale\": numero intero (0–100 oppure -1),\n"
             "  \"motivazione\": \"stringa\",\n"
+            "  \"marca_stimata\": \"stringa (vuota se non nota)\",\n"
             "  \"richiedi_altra_foto\": false,\n"
             "  \"dettaglio_richiesto\": \"\"\n"
             "}"
@@ -124,12 +121,16 @@ async def analizza_oggetto(input: OggettoInput):
 
         json_output = json.loads(contenuto)
 
-        campi_attesi = ["percentuale", "motivazione", "richiedi_altra_foto", "dettaglio_richiesto"]
+        campi_attesi = ["percentuale", "motivazione", "richiedi_altra_foto", "dettaglio_richiesto", "marca_stimata"]
         for campo in campi_attesi:
             if campo not in json_output:
                 raise HTTPException(status_code=500, detail=f"Campo mancante: {campo}")
 
         return json_output
+
+    except Exception as e:
+        logging.error(f"Errore backend: {e}")
+        raise HTTPException(status_code=500, detail="Errore durante l'elaborazione della richiesta.")
 
     except Exception as e:
         logging.error(f"Errore backend: {e}")
