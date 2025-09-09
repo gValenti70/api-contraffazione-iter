@@ -6,14 +6,20 @@ import os
 import json
 import logging
 
+# client = AzureOpenAI(
+#     api_key=os.getenv("OPENAI_APIKEY"),
+#     api_version="2024-12-01-preview",
+#     azure_endpoint="https://apitestfashion.openai.azure.com/"
+# )
+
 client = AzureOpenAI(
     api_key=os.getenv("OPENAI_APIKEY"),
     api_version="2024-12-01-preview",
-    azure_endpoint="https://apitestfashion.openai.azure.com/"
+    azure_endpoint="https://contraffazione-fashion-openai.openai.azure.com/"
 )
-
+deployment = "gpt-4.1"
 app = FastAPI()
-deployment = "gpt-4o"
+# deployment = "gpt-4o"
 
 class OggettoInput(BaseModel):
     tipologia: Optional[str] = "borsa"
